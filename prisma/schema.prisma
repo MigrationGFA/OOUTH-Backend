@@ -1,0 +1,582 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     String    @id @default(uuid())
+  role                   String
+  firstName              String
+  lastName               String
+  email                  String    @unique
+  phone                  String    @default("")
+  dateOfBirth            String?
+  gender                 String?
+  address                String?
+  patientNumber          String?   @unique
+  consultantSlug         String?
+  staffId                String?   @unique
+  departmentSlug         String?
+  designation            String?
+  specialty              String?
+  consultantNote         String?
+  onlineBookingEnabled   Boolean   @default(false)
+  emergencyContactName   String?
+  emergencyContactPhone  String?
+  active                 Boolean   @default(true)
+  registrationPaidYear   Int?
+  allergyStatus          String?
+  preview                Boolean   @default(false)
+  passwordHash           String
+  deletedAt              DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  refreshTokens          RefreshToken[]
+  notifications          Notification[]
+  @@index([role])
+  @@index([consultantSlug])
+  @@index([deletedAt])
+}
+
+model RefreshToken {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  familyId    String
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  replacedById String?
+  createdAt   DateTime  @default(now())
+  @@index([userId])
+  @@index([familyId])
+}
+
+model PasswordReset {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId])
+}
+
+model Department {
+  id              String    @id @default(uuid())
+  slug            String    @unique
+  name            String
+  group           String
+  summary         String
+  body            String
+  patientBooking  Boolean   @default(false)
+  operational     Boolean   @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  @@index([group])
+  @@index([patientBooking])
+}
+
+model Availability {
+  consultantSlug   String   @id
+  days             Json
+  startTime        String
+  endTime          String
+  durationMinutes  Int
+  breaks           Json
+  blockedDates     Json
+  physicalEnabled  Boolean  @default(true)
+  virtualEnabled   Boolean  @default(true)
+  provisional      Boolean  @default(true)
+  updatedAt        DateTime @updatedAt
+}
+
+model Appointment {
+  id                       String    @id @default(uuid())
+  reference                String    @unique
+  patientUserId            String
+  consultantSlug           String
+  departmentSlug           String    @default("")
+  consultationType         String
+  startsAt                 DateTime
+  endsAt                   DateTime
+  reason                   String
+  symptoms                 String    @default("")
+  medicalHistory           String    @default("")
+  status                   String
+  paymentStatus            String
+  paymentReference         String    @default("")
+  amountNaira              Int       @default(0)
+  consultationFeeNaira     Int       @default(0)
+  registrationFeeNaira     Int       @default(0)
+  durationMinutes          Int       @default(60)
+  privacyConsent           Boolean
+  telemedicineConsent      Boolean   @default(false)
+  suggestedDepartmentSlugs Json
+  patientInRoom            Boolean   @default(false)
+  consultantInRoom         Boolean   @default(false)
+  pendingStartsAt          DateTime?
+  pendingEndsAt            DateTime?
+  rescheduleFeeNaira       Int       @default(0)
+  bookingSource            String    @default("online")
+  durationHours            Int?
+  slotKey                  String?   @unique
+  pendingSlotKey           String?   @unique
+  cancelReason             String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  @@index([patientUserId])
+  @@index([consultantSlug])
+  @@index([status])
+  @@index([startsAt])
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  appointmentId String
+  patientUserId String
+  reference     String   @unique
+  purpose       String
+  amountNaira   Int
+  status        String
+  provider      String   @default("paystack")
+  verifiedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([appointmentId])
+  @@index([status])
+}
+
+model ClinicalRecord {
+  id                String   @id @default(uuid())
+  appointmentId     String
+  patientUserId     String
+  consultantSlug    String
+  notes             String
+  diagnosis         String
+  treatment         String
+  prescription      String
+  sharedWithPatient Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  @@index([appointmentId])
+  @@index([patientUserId])
+}
+
+model Encounter {
+  id               String   @id @default(uuid())
+  appointmentId    String
+  patientUserId    String
+  consultantSlug   String
+  authorUserId     String
+  version          Int
+  status           String   @default("signed")
+  supersedesId     String?
+  idempotencyKey   String   @unique
+  reportReference  String?
+  body             Json
+  signedAt         DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  @@unique([appointmentId, version])
+  @@index([patientUserId])
+  @@index([appointmentId])
+}
+
+model EncounterDraft {
+  appointmentId  String   @id
+  authorUserId   String
+  baseVersion    Int
+  revision       Int
+  body           Json
+  idempotencyKey String?
+  updatedAt      DateTime @updatedAt
+}
+
+model Document {
+  id                String   @id @default(uuid())
+  ownerUserId       String
+  appointmentId     String?
+  uploadedByUserId  String
+  name              String
+  mimeType          String
+  size              Int
+  bytes             Bytes
+  sharedWithPatient Boolean  @default(false)
+  uploadedAt        DateTime @default(now())
+  @@index([ownerUserId])
+  @@index([appointmentId])
+}
+
+model Allergy {
+  id               String   @id @default(uuid())
+  patientUserId    String
+  substance        String
+  reaction         String   @default("")
+  recordedByUserId String
+  source           String
+  recordedAt       DateTime @default(now())
+  @@index([patientUserId])
+}
+
+model Journey {
+  id                 String    @id @default(uuid())
+  reference          String    @unique
+  appointmentId      String
+  patientUserId      String
+  departmentSlug     String
+  consultantSlug     String
+  queueStatus        String
+  registeredByUserId String
+  arrivedAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  @@index([appointmentId])
+  @@index([patientUserId])
+  @@index([queueStatus])
+}
+
+model JourneyEvent {
+  id               String   @id @default(uuid())
+  journeyId        String
+  appointmentId    String
+  type             String
+  at               DateTime @default(now())
+  actorId          String
+  actorName        String
+  departmentSlug   String
+  status           String
+  relatedReference String   @default("")
+  @@index([journeyId])
+  @@index([appointmentId])
+}
+
+model Dispense {
+  id                     String    @id @default(uuid())
+  reference              String    @unique
+  prescriptionReference  String
+  appointmentId          String
+  encounterId            String
+  patientUserId          String
+  consultantSlug         String
+  departmentSlug         String
+  medicationItemId       String
+  medicationName         String
+  strength               String    @default("")
+  dose                   String    @default("")
+  route                  String    @default("")
+  frequency              String    @default("")
+  duration               String    @default("")
+  instructions           String    @default("")
+  status                 String
+  quantityDispensed      Int       @default(0)
+  dispensingInstructions String    @default("")
+  substitution           String    @default("")
+  clarification          String    @default("")
+  verificationCode       String
+  verifiedPatient        Boolean   @default(false)
+  collectedAt            DateTime?
+  collectedByUserId      String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  @@index([appointmentId])
+  @@index([patientUserId])
+  @@index([status])
+}
+
+model InventoryItem {
+  id           String    @id @default(uuid())
+  name         String
+  category     String
+  quantity     Int
+  unit         String
+  reorderLevel Int
+  deletedAt    DateTime?
+  updatedAt    DateTime  @updatedAt
+  @@index([name])
+}
+
+model InvestigationOrder {
+  id                      String    @id @default(uuid())
+  reference               String    @unique
+  appointmentId           String
+  encounterId             String
+  patientUserId           String
+  consultantSlug          String
+  departmentSlug          String
+  sourceItemId            String
+  kind                    String
+  name                    String
+  indication              String    @default("")
+  priority                String    @default("routine")
+  preparation             String    @default("")
+  status                  String
+  resultText              String    @default("")
+  resultFileName          String    @default("")
+  resultDataUrl           String    @default("")
+  performingOfficerUserId String    @default("")
+  interpretation          String    @default("")
+  releasedToPatient       Boolean   @default(false)
+  verificationCode        String
+  collectedAt             DateTime?
+  collectedByUserId       String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  @@index([appointmentId])
+  @@index([patientUserId])
+  @@index([kind, status])
+}
+
+model ObservationOrder {
+  id               String    @id @default(uuid())
+  patientUserId    String
+  level            String
+  intervalMinutes  Int
+  assignedByUserId String
+  assignedAt       DateTime  @default(now())
+  startAt          DateTime
+  endAt            DateTime?
+  instructions     String    @default("")
+  active           Boolean   @default(true)
+  @@index([patientUserId, active])
+}
+
+model Observation {
+  id            String   @id @default(uuid())
+  patientUserId String
+  appointmentId String?
+  nurseUserId   String
+  recordedAt    DateTime @default(now())
+  readings      Json
+  note          String   @default("")
+  behaviour     String   @default("")
+  risk          String?
+  orderId       String?
+  nextDueAt     DateTime?
+  @@index([patientUserId])
+  @@index([orderId])
+}
+
+model DeskPayment {
+  id                   String    @id @default(uuid())
+  reference            String    @unique
+  patientUserId        String
+  appointmentId        String?
+  consultantSlug       String    @default("")
+  departmentSlug       String    @default("")
+  durationHours        Int
+  registrationFeeNaira Int
+  consultationFeeNaira Int
+  totalNaira           Int
+  status               String
+  amountReceived       Int
+  paidAt               DateTime?
+  verifiedByUserId     String?
+  overrideReason       String?
+  createdAt            DateTime  @default(now())
+  @@index([patientUserId])
+  @@index([appointmentId])
+}
+
+model MedicationAdministration {
+  id               String   @id @default(uuid())
+  patientUserId    String
+  appointmentId    String
+  encounterId      String
+  medicationItemId String
+  medicationName   String
+  outcome          String
+  reason           String   @default("")
+  dose             String
+  route            String
+  scheduledFor     String
+  recordedAt       DateTime @default(now())
+  nurseUserId      String
+  note             String   @default("")
+  @@index([patientUserId])
+  @@index([encounterId, medicationItemId, scheduledFor])
+}
+
+model NursingTask {
+  id                  String   @id @default(uuid())
+  patientUserId       String
+  appointmentId       String?
+  assignedNurseUserId String
+  description         String
+  priority            String
+  dueAt               DateTime
+  status              String
+  completionNote      String   @default("")
+  sourceKey           String?
+  createdAt           DateTime @default(now())
+  @@index([patientUserId])
+  @@index([assignedNurseUserId])
+  @@index([sourceKey])
+}
+
+model Shift {
+  id          String    @id @default(uuid())
+  nurseUserId String
+  wardId      String
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  @@index([nurseUserId])
+}
+
+model Handover {
+  id                        String    @id @default(uuid())
+  shiftId                   String
+  patientUserId             String    @default("")
+  appointmentId             String?
+  authorUserId              String
+  condition                 String    @default("")
+  observations              String    @default("")
+  medicationsGiven          String    @default("")
+  pendingMedication         String    @default("")
+  outstandingInvestigations String    @default("")
+  pendingTasks              String    @default("")
+  changes                   String    @default("")
+  issues                    String    @default("")
+  generalSummary            String    @default("")
+  patientUpdates            String    @default("")
+  medicationUpdates         String    @default("")
+  observationUpdates        String    @default("")
+  pendingTasksNote          String    @default("")
+  clinicalConcerns          String    @default("")
+  nextInstructions          String    @default("")
+  status                    String    @default("draft")
+  amendsId                  String?
+  snapshot                  String    @default("")
+  acknowledgedByUserId      String?
+  acknowledgedAt            DateTime?
+  createdAt                 DateTime  @default(now())
+  @@index([shiftId])
+  @@index([authorUserId])
+}
+
+model Ward {
+  id   String @id
+  name String
+}
+
+model Bed {
+  id            String  @id
+  wardId        String
+  label         String
+  patientUserId String?
+  @@unique([wardId, label])
+}
+
+model Admission {
+  id              String   @id @default(uuid())
+  patientUserId   String
+  appointmentId   String?
+  wardId          String
+  bedId           String
+  consultantSlug  String
+  diagnosisLabel  String   @default("")
+  plan            String   @default("")
+  admittedAt      DateTime @default(now())
+  dischargeStatus String   @default("admitted")
+  @@index([patientUserId])
+  @@index([bedId])
+}
+
+model Rating {
+  id              String   @id @default(uuid())
+  appointmentId   String   @unique
+  patientUserId   String
+  consultantSlug  String
+  encounterId     String
+  overall         Int
+  communication   Int
+  professionalism Int
+  attention       Int
+  feedback        String   @default("")
+  hidden          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  @@index([consultantSlug])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  href      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  @@index([userId, read])
+}
+
+model AuditEvent {
+  id         String   @id @default(uuid())
+  at         DateTime @default(now())
+  actorId    String
+  action     String
+  summary    String
+  entityType String?
+  entityId   String?
+  @@index([actorId])
+  @@index([action])
+  @@index([at])
+}
+
+model HospitalSettings {
+  id                        String @id @default("default")
+  consultationPerHourNaira  Int
+  registrationFeeNaira      Int
+  defaultDurationMinutes    Int
+  cancellationNoticeHours   Int
+  rescheduleNoticeHours     Int
+  joinMinutesBefore         Int
+  joinMinutesAfter          Int
+}
+
+model IdempotencyKey {
+  id        String   @id @default(uuid())
+  userId    String
+  key       String
+  route     String
+  response  Json
+  createdAt DateTime @default(now())
+  @@unique([userId, key, route])
+}
+
+model Counter {
+  key   String @id
+  value Int
+}
+
+model CatalogMedication {
+  code     String @id
+  name     String
+  category String
+  form     String
+  strength String
+}
+
+model CatalogDiagnosis {
+  code     String @id
+  name     String
+  system   String
+  category String
+}
+
+model CatalogImaging {
+  code       String @id
+  name       String
+  modality   String
+  bodyRegion String
+}
+
+model CatalogLaboratory {
+  code   String @id
+  name   String
+  sample String
+}
